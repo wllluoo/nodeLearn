@@ -1,0 +1,1006 @@
+12121212
+Node.js v6.11.3 Documentation
+Index | View on single page | View as JSON
+
+Table of Contents
+
+File System
+Buffer API
+Class: fs.FSWatcher
+Event: 'change'
+Event: 'error'
+watcher.close()
+Class: fs.ReadStream
+Event: 'open'
+Event: 'close'
+readStream.bytesRead
+readStream.path
+Class: fs.Stats
+Stat Time Values
+Class: fs.WriteStream
+Event: 'open'
+Event: 'close'
+writeStream.bytesWritten
+writeStream.path
+fs.access(path[, mode], callback)
+fs.accessSync(path[, mode])
+fs.appendFile(file, data[, options], callback)
+fs.appendFileSync(file, data[, options])
+fs.chmod(path, mode, callback)
+fs.chmodSync(path, mode)
+fs.chown(path, uid, gid, callback)
+fs.chownSync(path, uid, gid)
+fs.close(fd, callback)
+fs.closeSync(fd)
+fs.constants
+fs.createReadStream(path[, options])
+fs.createWriteStream(path[, options])
+fs.exists(path, callback)
+fs.existsSync(path)
+fs.fchmod(fd, mode, callback)
+fs.fchmodSync(fd, mode)
+fs.fchown(fd, uid, gid, callback)
+fs.fchownSync(fd, uid, gid)
+fs.fdatasync(fd, callback)
+fs.fdatasyncSync(fd)
+fs.fstat(fd, callback)
+fs.fstatSync(fd)
+fs.fsync(fd, callback)
+fs.fsyncSync(fd)
+fs.ftruncate(fd, len, callback)
+fs.ftruncateSync(fd, len)
+fs.futimes(fd, atime, mtime, callback)
+fs.futimesSync(fd, atime, mtime)
+fs.lchmod(path, mode, callback)
+fs.lchmodSync(path, mode)
+fs.lchown(path, uid, gid, callback)
+fs.lchownSync(path, uid, gid)
+fs.link(existingPath, newPath, callback)
+fs.linkSync(existingPath, newPath)
+fs.lstat(path, callback)
+fs.lstatSync(path)
+fs.mkdir(path[, mode], callback)
+fs.mkdirSync(path[, mode])
+fs.mkdtemp(prefix[, options], callback)
+fs.mkdtempSync(prefix[, options])
+fs.open(path, flags[, mode], callback)
+fs.openSync(path, flags[, mode])
+fs.read(fd, buffer, offset, length, position, callback)
+fs.readdir(path[, options], callback)
+fs.readdirSync(path[, options])
+fs.readFile(file[, options], callback)
+fs.readFileSync(file[, options])
+fs.readlink(path[, options], callback)
+fs.readlinkSync(path[, options])
+fs.readSync(fd, buffer, offset, length, position)
+fs.realpath(path[, options], callback)
+fs.realpathSync(path[, options])
+fs.rename(oldPath, newPath, callback)
+fs.renameSync(oldPath, newPath)
+fs.rmdir(path, callback)
+fs.rmdirSync(path)
+fs.stat(path, callback)
+fs.statSync(path)
+fs.symlink(target, path[, type], callback)
+fs.symlinkSync(target, path[, type])
+fs.truncate(path, len, callback)
+fs.truncateSync(path, len)
+fs.unlink(path, callback)
+fs.unlinkSync(path)
+fs.unwatchFile(filename[, listener])
+fs.utimes(path, atime, mtime, callback)
+fs.utimesSync(path, atime, mtime)
+fs.watch(filename[, options][, listener])
+Caveats
+Availability
+Inodes
+Filename Argument
+fs.watchFile(filename[, options], listener)
+fs.write(fd, buffer, offset, length[, position], callback)
+fs.write(fd, data[, position[, encoding]], callback)
+fs.writeFile(file, data[, options], callback)
+fs.writeFileSync(file, data[, options])
+fs.writeSync(fd, buffer, offset, length[, position])
+fs.writeSync(fd, data[, position[, encoding]])
+FS Constants
+File Access Constants
+File Open Constants
+File Type Constants
+File Mode Constants
+File System#
+Stability: 2 - Stable
+File I/O is provided by simple wrappers around standard POSIX functions. To use this module do require('fs'). All the methods have asynchronous and synchronous forms.
+
+The asynchronous form always takes a completion callback as its last argument. The arguments passed to the completion callback depend on the method, but the first argument is always reserved for an exception. If the operation was completed successfully, then the first argument will be null or undefined.
+
+When using the synchronous form any exceptions are immediately thrown. You can use try/catch to handle exceptions or allow them to bubble up.
+
+Here is an example of the asynchronous version:
+
+const fs = require('fs');
+
+fs.unlink('/tmp/hello', (err) => {
+  if (err) throw err;
+  console.log('successfully deleted /tmp/hello');
+});
+Here is the synchronous version:
+
+const fs = require('fs');
+
+fs.unlinkSync('/tmp/hello');
+console.log('successfully deleted /tmp/hello');
+With the asynchronous methods there is no guaranteed ordering. So the following is prone to error:
+
+fs.rename('/tmp/hello', '/tmp/world', (err) => {
+  if (err) throw err;
+  console.log('renamed complete');
+});
+fs.stat('/tmp/world', (err, stats) => {
+  if (err) throw err;
+  console.log(`stats: ${JSON.stringify(stats)}`);
+});
+It could be that fs.stat is executed before fs.rename. The correct way to do this is to chain the callbacks.
+
+fs.rename('/tmp/hello', '/tmp/world', (err) => {
+  if (err) throw err;
+  fs.stat('/tmp/world', (err, stats) => {
+    if (err) throw err;
+    console.log(`stats: ${JSON.stringify(stats)}`);
+  });
+});
+In busy processes, the programmer is strongly encouraged to use the asynchronous versions of these calls. The synchronous versions will block the entire process until they complete--halting all connections.
+
+The relative path to a filename can be used. Remember, however, that this path will be relative to process.cwd().
+
+Most fs functions let you omit the callback argument. If you do, a default callback is used that rethrows errors. To get a trace to the original call site, set the NODE_DEBUG environment variable:
+
+$ cat script.js
+function bad() {
+  require('fs').readFile('/');
+}
+bad();
+
+$ env NODE_DEBUG=fs node script.js
+fs.js:88
+        throw backtrace;
+        ^
+Error: EISDIR: illegal operation on a directory, read
+    <stack trace.>
+Buffer API#
+Added in: v6.0.0
+fs functions support passing and receiving paths as both strings and Buffers. The latter is intended to make it possible to work with filesystems that allow for non-UTF-8 filenames. For most typical uses, working with paths as Buffers will be unnecessary, as the string API converts to and from UTF-8 automatically.
+
+Note that on certain file systems (such as NTFS and HFS+) filenames will always be encoded as UTF-8. On such file systems, passing non-UTF-8 encoded Buffers to fs functions will not work as expected.
+
+Class: fs.FSWatcher#
+Added in: v0.5.8
+Objects returned from fs.watch() are of this type.
+
+The listener callback provided to fs.watch() receives the returned FSWatcher's change events.
+
+The object itself emits these events:
+
+Event: 'change'#
+
+Added in: v0.5.8
+eventType <string> The type of fs change
+filename <string> | <Buffer> The filename that changed (if relevant/available)
+Emitted when something changes in a watched directory or file. See more details in fs.watch().
+
+The filename argument may not be provided depending on operating system support. If filename is provided, it will be provided as a Buffer if fs.watch() is called with its encoding option set to 'buffer', otherwise filename will be a string.
+
+// Example when handled through fs.watch listener
+fs.watch('./tmp', {encoding: 'buffer'}, (eventType, filename) => {
+  if (filename)
+    console.log(filename);
+  // Prints: <Buffer ...>
+});
+Event: 'error'#
+
+Added in: v0.5.8
+error <Error>
+Emitted when an error occurs.
+
+watcher.close()#
+
+Added in: v0.5.8
+Stop watching for changes on the given fs.FSWatcher.
+
+Class: fs.ReadStream#
+Added in: v0.1.93
+ReadStream is a Readable Stream.
+
+Event: 'open'#
+
+Added in: v0.1.93
+fd <Integer> Integer file descriptor used by the ReadStream.
+Emitted when the ReadStream's file is opened.
+
+Event: 'close'#
+
+Added in: v0.1.93
+fd <integer> Integer file descriptor used by the ReadStream.
+Emitted when the ReadStream's file is opened.
+
+readStream.bytesRead#
+
+Added in: 6.4.0
+The number of bytes read so far.
+
+readStream.path#
+
+Added in: v0.1.93
+The path to the file the stream is reading from as specified in the first argument to fs.createReadStream(). If path is passed as a string, then readStream.path will be a string. If path is passed as a Buffer, then readStream.path will be a Buffer.
+
+Class: fs.Stats#
+Added in: v0.1.21
+Objects returned from fs.stat(), fs.lstat() and fs.fstat() and their synchronous counterparts are of this type.
+
+stats.isFile()
+stats.isDirectory()
+stats.isBlockDevice()
+stats.isCharacterDevice()
+stats.isSymbolicLink() (only valid with fs.lstat())
+stats.isFIFO()
+stats.isSocket()
+For a regular file util.inspect(stats) would return a string very similar to this:
+
+Stats {
+  dev: 2114,
+  ino: 48064969,
+  mode: 33188,
+  nlink: 1,
+  uid: 85,
+  gid: 100,
+  rdev: 0,
+  size: 527,
+  blksize: 4096,
+  blocks: 8,
+  atime: Mon, 10 Oct 2011 23:24:11 GMT,
+  mtime: Mon, 10 Oct 2011 23:24:11 GMT,
+  ctime: Mon, 10 Oct 2011 23:24:11 GMT,
+  birthtime: Mon, 10 Oct 2011 23:24:11 GMT }
+Please note that atime, mtime, birthtime, and ctime are instances of Date object and to compare the values of these objects you should use appropriate methods. For most general uses getTime() will return the number of milliseconds elapsed since 1 January 1970 00:00:00 UTC and this integer should be sufficient for any comparison, however there are additional methods which can be used for displaying fuzzy information. More details can be found in the MDN JavaScript Reference page.
+
+Stat Time Values#
+
+The times in the stat object have the following semantics:
+
+atime "Access Time" - Time when file data last accessed. Changed by the mknod(2), utimes(2), and read(2) system calls.
+mtime "Modified Time" - Time when file data last modified. Changed by the mknod(2), utimes(2), and write(2) system calls.
+ctime "Change Time" - Time when file status was last changed (inode data modification). Changed by the chmod(2), chown(2), link(2), mknod(2), rename(2), unlink(2), utimes(2), read(2), and write(2) system calls.
+birthtime "Birth Time" - Time of file creation. Set once when the file is created. On filesystems where birthtime is not available, this field may instead hold either the ctime or 1970-01-01T00:00Z (ie, unix epoch timestamp 0). Note that this value may be greater than atime or mtime in this case. On Darwin and other FreeBSD variants, also set if the atime is explicitly set to an earlier value than the current birthtime using the utimes(2) system call.
+Prior to Node v0.12, the ctime held the birthtime on Windows systems. Note that as of v0.12, ctime is not "creation time", and on Unix systems, it never was.
+
+Class: fs.WriteStream#
+Added in: v0.1.93
+WriteStream is a Writable Stream.
+
+Event: 'open'#
+
+Added in: v0.1.93
+fd <Integer> Integer file descriptor used by the WriteStream.
+Emitted when the WriteStream's file is opened.
+
+Event: 'close'#
+
+Added in: v0.1.93
+fd <integer> Integer file descriptor used by the WriteStream.
+Emitted when the WriteStream's file is opened.
+
+writeStream.bytesWritten#
+
+Added in: v0.4.7
+The number of bytes written so far. Does not include data that is still queued for writing.
+
+writeStream.path#
+
+Added in: v0.1.93
+The path to the file the stream is writing to as specified in the first argument to fs.createWriteStream(). If path is passed as a string, then writeStream.path will be a string. If path is passed as a Buffer, then writeStream.path will be a Buffer.
+
+fs.access(path[, mode], callback)#
+Added in: v0.11.15
+path <string> | <Buffer>
+mode <integer>
+callback <Function>
+Tests a user's permissions for the file or directory specified by path. The mode argument is an optional integer that specifies the accessibility checks to be performed. The following constants define the possible values of mode. It is possible to create a mask consisting of the bitwise OR of two or more values.
+
+fs.constants.F_OK - path is visible to the calling process. This is useful for determining if a file exists, but says nothing about rwx permissions. Default if no mode is specified.
+fs.constants.R_OK - path can be read by the calling process.
+fs.constants.W_OK - path can be written by the calling process.
+fs.constants.X_OK - path can be executed by the calling process. This has no effect on Windows (will behave like fs.constants.F_OK).
+The final argument, callback, is a callback function that is invoked with a possible error argument. If any of the accessibility checks fail, the error argument will be populated. The following example checks if the file /etc/passwd can be read and written by the current process.
+
+fs.access('/etc/passwd', fs.constants.R_OK | fs.constants.W_OK, (err) => {
+  console.log(err ? 'no access!' : 'can read/write');
+});
+Using fs.access() to check for the accessibility of a file before calling fs.open(), fs.readFile() or fs.writeFile() is not recommended. Doing so introduces a race condition, since other processes may change the file's state between the two calls. Instead, user code should open/read/write the file directly and handle the error raised if the file is not accessible.
+
+For example:
+
+write (NOT RECOMMENDED)
+
+fs.access('myfile', (err) => {
+  if (!err) {
+    console.error('myfile already exists');
+    return;
+  }
+
+  fs.open('myfile', 'wx', (err, fd) => {
+    if (err) throw err;
+    writeMyData(fd);
+  });
+});
+write (RECOMMENDED)
+
+fs.open('myfile', 'wx', (err, fd) => {
+  if (err) {
+    if (err.code === 'EEXIST') {
+      console.error('myfile already exists');
+      return;
+    }
+
+    throw err;
+  }
+
+  writeMyData(fd);
+});
+read (NOT RECOMMENDED)
+
+fs.access('myfile', (err) => {
+  if (err) {
+    if (err.code === 'ENOENT') {
+      console.error('myfile does not exist');
+      return;
+    }
+
+    throw err;
+  }
+
+  fs.open('myfile', 'r', (err, fd) => {
+    if (err) throw err;
+    readMyData(fd);
+  });
+});
+read (RECOMMENDED)
+
+fs.open('myfile', 'r', (err, fd) => {
+  if (err) {
+    if (err.code === 'ENOENT') {
+      console.error('myfile does not exist');
+      return;
+    }
+
+    throw err;
+  }
+
+  readMyData(fd);
+});
+The "not recommended" examples above check for accessibility and then use the file; the "recommended" examples are better because they use the file directly and handle the error, if any.
+
+In general, check for the accessibility of a file only if the file won’t be used directly, for example when its accessibility is a signal from another process.
+
+fs.accessSync(path[, mode])#
+Added in: v0.11.15
+path <string> | <Buffer>
+mode <integer>
+Synchronous version of fs.access(). This throws if any accessibility checks fail, and does nothing otherwise.
+
+fs.appendFile(file, data[, options], callback)#
+Added in: v0.6.7
+file <string> | <Buffer> | <number> filename or file descriptor
+data <string> | <Buffer>
+options <Object> | <string>
+encoding <string> | <null> default = 'utf8'
+mode <integer> default = 0o666
+flag <string> default = 'a'
+callback <Function>
+Asynchronously append data to a file, creating the file if it does not yet exist. data can be a string or a buffer.
+
+Example:
+
+fs.appendFile('message.txt', 'data to append', (err) => {
+  if (err) throw err;
+  console.log('The "data to append" was appended to file!');
+});
+If options is a string, then it specifies the encoding. Example:
+
+fs.appendFile('message.txt', 'data to append', 'utf8', callback);
+Any specified file descriptor has to have been opened for appending.
+
+Note: If a file descriptor is specified as the file, it will not be closed automatically.
+
+fs.appendFileSync(file, data[, options])#
+Added in: v0.6.7
+file <string> | <Buffer> | <number> filename or file descriptor
+data <string> | <Buffer>
+options <Object> | <string>
+encoding <string> | <null> default = 'utf8'
+mode <integer> default = 0o666
+flag <string> default = 'a'
+The synchronous version of fs.appendFile(). Returns undefined.
+
+fs.chmod(path, mode, callback)#
+Added in: v0.1.30
+path <string> | <Buffer>
+mode <integer>
+callback <Function>
+Asynchronous chmod(2). No arguments other than a possible exception are given to the completion callback.
+
+fs.chmodSync(path, mode)#
+Added in: v0.6.7
+path <string> | <Buffer>
+mode <integer>
+Synchronous chmod(2). Returns undefined.
+
+fs.chown(path, uid, gid, callback)#
+Added in: v0.1.97
+path <string> | <Buffer>
+uid <integer>
+gid <integer>
+callback <Function>
+Asynchronous chown(2). No arguments other than a possible exception are given to the completion callback.
+
+fs.chownSync(path, uid, gid)#
+Added in: v0.1.97
+path <string> | <Buffer>
+uid <integer>
+gid <integer>
+Synchronous chown(2). Returns undefined.
+
+fs.close(fd, callback)#
+Added in: v0.0.2
+fd <integer>
+callback <Function>
+Asynchronous close(2). No arguments other than a possible exception are given to the completion callback.
+
+fs.closeSync(fd)#
+Added in: v0.1.21
+fd <integer>
+Synchronous close(2). Returns undefined.
+
+fs.constants#
+Returns an object containing commonly used constants for file system operations. The specific constants currently defined are described in FS Constants.
+
+fs.createReadStream(path[, options])#
+Added in: v0.1.31
+path <string> | <Buffer>
+options <string> | <Object>
+flags <string>
+encoding <string>
+fd <integer>
+mode <integer>
+autoClose <boolean>
+start <integer>
+end <integer>
+Returns a new ReadStream object. (See Readable Stream).
+
+Be aware that, unlike the default value set for highWaterMark on a readable stream (16 kb), the stream returned by this method has a default value of 64 kb for the same parameter.
+
+options is an object or string with the following defaults:
+
+const defaults = {
+  flags: 'r',
+  encoding: null,
+  fd: null,
+  mode: 0o666,
+  autoClose: true
+};
+options can include start and end values to read a range of bytes from the file instead of the entire file. Both start and end are inclusive and start counting at 0. If fd is specified and start is omitted or undefined, fs.createReadStream() reads sequentially from the current file position. The encoding can be any one of those accepted by Buffer.
+
+If fd is specified, ReadStream will ignore the path argument and will use the specified file descriptor. This means that no 'open' event will be emitted. Note that fd should be blocking; non-blocking fds should be passed to net.Socket.
+
+If autoClose is false, then the file descriptor won't be closed, even if there's an error. It is your responsibility to close it and make sure there's no file descriptor leak. If autoClose is set to true (default behavior), on error or end the file descriptor will be closed automatically.
+
+mode sets the file mode (permission and sticky bits), but only if the file was created.
+
+An example to read the last 10 bytes of a file which is 100 bytes long:
+
+fs.createReadStream('sample.txt', {start: 90, end: 99});
+If options is a string, then it specifies the encoding.
+
+fs.createWriteStream(path[, options])#
+Added in: v0.1.31
+path <string> | <Buffer>
+options <string> | <Object>
+flags <string>
+defaultEncoding <string>
+fd <integer>
+mode <integer>
+autoClose <boolean>
+start <integer>
+Returns a new WriteStream object. (See Writable Stream).
+
+options is an object or string with the following defaults:
+
+const defaults = {
+  flags: 'w',
+  defaultEncoding: 'utf8',
+  fd: null,
+  mode: 0o666,
+  autoClose: true
+};
+options may also include a start option to allow writing data at some position past the beginning of the file. Modifying a file rather than replacing it may require a flags mode of r+ rather than the default mode w. The defaultEncoding can be any one of those accepted by Buffer.
+
+If autoClose is set to true (default behavior) on error or end the file descriptor will be closed automatically. If autoClose is false, then the file descriptor won't be closed, even if there's an error. It is your responsibility to close it and make sure there's no file descriptor leak.
+
+Like ReadStream, if fd is specified, WriteStream will ignore the path argument and will use the specified file descriptor. This means that no 'open' event will be emitted. Note that fd should be blocking; non-blocking fds should be passed to net.Socket.
+
+If options is a string, then it specifies the encoding.
+
+fs.exists(path, callback)#
+Added in: v0.0.2 Deprecated since: v1.0.0
+Stability: 0 - Deprecated: Use fs.stat() or fs.access() instead.
+path <string> | <Buffer>
+callback <Function>
+Test whether or not the given path exists by checking with the file system. Then call the callback argument with either true or false. Example:
+
+fs.exists('/etc/passwd', (exists) => {
+  console.log(exists ? 'it\'s there' : 'no passwd!');
+});
+Note that the parameter to this callback is not consistent with other Node.js callbacks. Normally, the first parameter to a Node.js callback is an err parameter, optionally followed by other parameters. The fs.exists() callback has only one boolean parameter. This is one reason fs.access() is recommended instead of fs.exists().
+
+Using fs.exists() to check for the existence of a file before calling fs.open(), fs.readFile() or fs.writeFile() is not recommended. Doing so introduces a race condition, since other processes may change the file's state between the two calls. Instead, user code should open/read/write the file directly and handle the error raised if the file does not exist.
+
+For example:
+
+write (NOT RECOMMENDED)
+
+fs.exists('myfile', (exists) => {
+  if (exists) {
+    console.error('myfile already exists');
+  } else {
+    fs.open('myfile', 'wx', (err, fd) => {
+      if (err) throw err;
+      writeMyData(fd);
+    });
+  }
+});
+write (RECOMMENDED)
+
+fs.open('myfile', 'wx', (err, fd) => {
+  if (err) {
+    if (err.code === 'EEXIST') {
+      console.error('myfile already exists');
+      return;
+    }
+
+    throw err;
+  }
+
+  writeMyData(fd);
+});
+read (NOT RECOMMENDED)
+
+fs.exists('myfile', (exists) => {
+  if (exists) {
+    fs.open('myfile', 'r', (err, fd) => {
+      readMyData(fd);
+    });
+  } else {
+    console.error('myfile does not exist');
+  }
+});
+read (RECOMMENDED)
+
+fs.open('myfile', 'r', (err, fd) => {
+  if (err) {
+    if (err.code === 'ENOENT') {
+      console.error('myfile does not exist');
+      return;
+    }
+
+    throw err;
+  }
+
+  readMyData(fd);
+});
+The "not recommended" examples above check for existence and then use the file; the "recommended" examples are better because they use the file directly and handle the error, if any.
+
+In general, check for the existence of a file only if the file won’t be used directly, for example when its existence is a signal from another process.
+
+fs.existsSync(path)#
+Added in: v0.1.21
+path <string> | <Buffer>
+Synchronous version of fs.exists(). Returns true if the file exists, false otherwise.
+
+Note that fs.exists() is deprecated, but fs.existsSync() is not. (The callback parameter to fs.exists() accepts parameters that are inconsistent with other Node.js callbacks. fs.existsSync() does not use a callback.)
+
+fs.fchmod(fd, mode, callback)#
+Added in: v0.4.7
+fd <integer>
+mode <integer>
+callback <Function>
+Asynchronous fchmod(2). No arguments other than a possible exception are given to the completion callback.
+
+fs.fchmodSync(fd, mode)#
+Added in: v0.4.7
+fd <integer>
+mode <integer>
+Synchronous fchmod(2). Returns undefined.
+
+fs.fchown(fd, uid, gid, callback)#
+Added in: v0.4.7
+fd <integer>
+uid <integer>
+gid <integer>
+callback <Function>
+Asynchronous fchown(2). No arguments other than a possible exception are given to the completion callback.
+
+fs.fchownSync(fd, uid, gid)#
+Added in: v0.4.7
+fd <integer>
+uid <integer>
+gid <integer>
+Synchronous fchown(2). Returns undefined.
+
+fs.fdatasync(fd, callback)#
+Added in: v0.1.96
+fd <integer>
+callback <Function>
+Asynchronous fdatasync(2). No arguments other than a possible exception are given to the completion callback.
+
+fs.fdatasyncSync(fd)#
+Added in: v0.1.96
+fd <integer>
+Synchronous fdatasync(2). Returns undefined.
+
+fs.fstat(fd, callback)#
+Added in: v0.1.95
+fd <integer>
+callback <Function>
+Asynchronous fstat(2). The callback gets two arguments (err, stats) where stats is an fs.Stats object. fstat() is identical to stat(), except that the file to be stat-ed is specified by the file descriptor fd.
+
+fs.fstatSync(fd)#
+Added in: v0.1.95
+fd <integer>
+Synchronous fstat(2). Returns an instance of fs.Stats.
+
+fs.fsync(fd, callback)#
+Added in: v0.1.96
+fd <integer>
+callback <Function>
+Asynchronous fsync(2). No arguments other than a possible exception are given to the completion callback.
+
+fs.fsyncSync(fd)#
+Added in: v0.1.96
+fd <integer>
+Synchronous fsync(2). Returns undefined.
+
+fs.ftruncate(fd, len, callback)#
+Added in: v0.8.6
+fd <integer>
+len <integer> default = 0
+callback <Function>
+Asynchronous ftruncate(2). No arguments other than a possible exception are given to the completion callback.
+
+If the file referred to by the file descriptor was larger than len bytes, only the first len bytes will be retained in the file.
+
+For example, the following program retains only the first four bytes of the file
+
+console.log(fs.readFileSync('temp.txt', 'utf8'));
+// Prints: Node.js
+
+// get the file descriptor of the file to be truncated
+const fd = fs.openSync('temp.txt', 'r+');
+
+// truncate the file to first four bytes
+fs.ftruncate(fd, 4, (err) => {
+  assert.ifError(err);
+  console.log(fs.readFileSync('temp.txt', 'utf8'));
+});
+// Prints: Node
+If the file previously was shorter than len bytes, it is extended, and the extended part is filled with null bytes ('\0'). For example,
+
+console.log(fs.readFileSync('temp.txt', 'utf-8'));
+// Prints: Node.js
+
+// get the file descriptor of the file to be truncated
+const fd = fs.openSync('temp.txt', 'r+');
+
+// truncate the file to 10 bytes, whereas the actual size is 7 bytes
+fs.ftruncate(fd, 10, (err) => {
+  assert.ifError(err);
+  console.log(fs.readFileSync('temp.txt'));
+});
+// Prints: <Buffer 4e 6f 64 65 2e 6a 73 00 00 00>
+// ('Node.js\0\0\0' in UTF8)
+The last three bytes are null bytes ('\0'), to compensate the over-truncation.
+
+fs.ftruncateSync(fd, len)#
+Added in: v0.8.6
+fd <integer>
+len <integer> default = 0
+Synchronous ftruncate(2). Returns undefined.
+
+fs.futimes(fd, atime, mtime, callback)#
+Added in: v0.4.2
+fd <integer>
+atime <integer>
+mtime <integer>
+callback <Function>
+Change the file timestamps of a file referenced by the supplied file descriptor.
+
+Note: This function does not work on AIX versions before 7.1, it will return the error UV_ENOSYS.
+
+fs.futimesSync(fd, atime, mtime)#
+Added in: v0.4.2
+fd <integer>
+atime <integer>
+mtime <integer>
+Synchronous version of fs.futimes(). Returns undefined.
+
+fs.lchmod(path, mode, callback)#
+Deprecated since: v0.4.7
+path <string> | <Buffer>
+mode <integer>
+callback <Function>
+Asynchronous lchmod(2). No arguments other than a possible exception are given to the completion callback.
+
+Only available on macOS.
+
+fs.lchmodSync(path, mode)#
+Deprecated since: v0.4.7
+path <string> | <Buffer>
+mode <integer>
+Synchronous lchmod(2). Returns undefined.
+
+fs.lchown(path, uid, gid, callback)#
+Deprecated since: v0.4.7
+path <string> | <Buffer>
+uid <integer>
+gid <integer>
+callback <Function>
+Asynchronous lchown(2). No arguments other than a possible exception are given to the completion callback.
+
+fs.lchownSync(path, uid, gid)#
+Deprecated since: v0.4.7
+path <string> | <Buffer>
+uid <integer>
+gid <integer>
+Synchronous lchown(2). Returns undefined.
+
+fs.link(existingPath, newPath, callback)#
+Added in: v0.1.31
+existingPath <string> | <Buffer>
+newPath <string> | <Buffer>
+callback <Function>
+Asynchronous link(2). No arguments other than a possible exception are given to the completion callback.
+
+fs.linkSync(existingPath, newPath)#
+Added in: v0.1.31
+existingPath <string> | <Buffer>
+newPath <string> | <Buffer>
+Synchronous link(2). Returns undefined.
+
+fs.lstat(path, callback)#
+Added in: v0.1.30
+path <string> | <Buffer>
+callback <Function>
+Asynchronous lstat(2). The callback gets two arguments (err, stats) where stats is a fs.Stats object. lstat() is identical to stat(), except that if path is a symbolic link, then the link itself is stat-ed, not the file that it refers to.
+
+fs.lstatSync(path)#
+Added in: v0.1.30
+path <string> | <Buffer>
+Synchronous lstat(2). Returns an instance of fs.Stats.
+
+fs.mkdir(path[, mode], callback)#
+Added in: v0.1.8
+path <string> | <Buffer>
+mode <integer>
+callback <Function>
+Asynchronous mkdir(2). No arguments other than a possible exception are given to the completion callback. mode defaults to 0o777.
+
+fs.mkdirSync(path[, mode])#
+Added in: v0.1.21
+path <string> | <Buffer>
+mode <integer>
+Synchronous mkdir(2). Returns undefined.
+
+fs.mkdtemp(prefix[, options], callback)#
+Added in: v5.10.0
+prefix <string>
+options <string> | <Object>
+encoding <string> default = 'utf8'
+callback <Function>
+Creates a unique temporary directory.
+
+Generates six random characters to be appended behind a required prefix to create a unique temporary directory.
+
+The created folder path is passed as a string to the callback's second parameter.
+
+The optional options argument can be a string specifying an encoding, or an object with an encoding property specifying the character encoding to use.
+
+Example:
+
+fs.mkdtemp('/tmp/foo-', (err, folder) => {
+  if (err) throw err;
+  console.log(folder);
+  // Prints: /tmp/foo-itXde2
+});
+Note: The fs.mkdtemp() method will append the six randomly selected characters directly to the prefix string. For instance, given a directory /tmp, if the intention is to create a temporary directory within /tmp, the prefix must end with a trailing platform-specific path separator (require('path').sep).
+
+// The parent directory for the new temporary directory
+const tmpDir = '/tmp';
+
+// This method is *INCORRECT*:
+fs.mkdtemp(tmpDir, (err, folder) => {
+  if (err) throw err;
+  console.log(folder);
+  // Will print something similar to `/tmpabc123`.
+  // Note that a new temporary directory is created
+  // at the file system root rather than *within*
+  // the /tmp directory.
+});
+
+// This method is *CORRECT*:
+const { sep } = require('path');
+fs.mkdtemp(`${tmpDir}${sep}`, (err, folder) => {
+  if (err) throw err;
+  console.log(folder);
+  // Will print something similar to `/tmp/abc123`.
+  // A new temporary directory is created within
+  // the /tmp directory.
+});
+fs.mkdtempSync(prefix[, options])#
+Added in: v5.10.0
+prefix <string>
+options <string> | <Object>
+encoding <string> default = 'utf8'
+The synchronous version of fs.mkdtemp(). Returns the created folder path.
+
+The optional options argument can be a string specifying an encoding, or an object with an encoding property specifying the character encoding to use.
+
+fs.open(path, flags[, mode], callback)#
+Added in: v0.0.2
+path <string> | <Buffer>
+flags <string> | <number>
+mode <integer>
+callback <Function>
+Asynchronous file open. See open(2). flags can be:
+
+'r' - Open file for reading. An exception occurs if the file does not exist.
+
+'r+' - Open file for reading and writing. An exception occurs if the file does not exist.
+
+'rs+' - Open file for reading and writing in synchronous mode. Instructs the operating system to bypass the local file system cache.
+
+This is primarily useful for opening files on NFS mounts as it allows you to skip the potentially stale local cache. It has a very real impact on I/O performance so don't use this flag unless you need it.
+
+Note that this doesn't turn fs.open() into a synchronous blocking call. If that's what you want then you should be using fs.openSync()
+
+'w' - Open file for writing. The file is created (if it does not exist) or truncated (if it exists).
+
+'wx' - Like 'w' but fails if path exists.
+
+'w+' - Open file for reading and writing. The file is created (if it does not exist) or truncated (if it exists).
+
+'wx+' - Like 'w+' but fails if path exists.
+
+'a' - Open file for appending. The file is created if it does not exist.
+
+'ax' - Like 'a' but fails if path exists.
+
+'a+' - Open file for reading and appending. The file is created if it does not exist.
+
+'ax+' - Like 'a+' but fails if path exists.
+
+mode sets the file mode (permission and sticky bits), but only if the file was created. It defaults to 0666, readable and writable.
+
+The callback gets two arguments (err, fd).
+
+The exclusive flag 'x' (O_EXCL flag in open(2)) ensures that path is newly created. On POSIX systems, path is considered to exist even if it is a symlink to a non-existent file. The exclusive flag may or may not work with network file systems.
+
+flags can also be a number as documented by open(2); commonly used constants are available from fs.constants. On Windows, flags are translated to their equivalent ones where applicable, e.g. O_WRONLY to FILE_GENERIC_WRITE, or O_EXCL|O_CREAT to CREATE_NEW, as accepted by CreateFileW.
+
+On Linux, positional writes don't work when the file is opened in append mode. The kernel ignores the position argument and always appends the data to the end of the file.
+
+Note: The behavior of fs.open() is platform-specific for some flags. As such, opening a directory on macOS and Linux with the 'a+' flag - see example below - will return an error. In contrast, on Windows and FreeBSD, a file descriptor will be returned.
+
+// macOS and Linux
+fs.open('<directory>', 'a+', (err, fd) => {
+  // => [Error: EISDIR: illegal operation on a directory, open <directory>]
+});
+
+// Windows and FreeBSD
+fs.open('<directory>', 'a+', (err, fd) => {
+  // => null, <fd>
+});
+Some characters (< > : " / \ | ? *) are reserved under Windows as documented by Naming Files, Paths, and Namespaces. Under NTFS, if the filename contains a colon, Node.js will open a file system stream, as described by this MSDN page.
+
+Functions based on fs.open() exhibit this behavior as well. eg. fs.writeFile(), fs.readFile(), etc.
+
+fs.openSync(path, flags[, mode])#
+Added in: v0.1.21
+path <string> | <Buffer>
+flags <string> | <number>
+mode <integer>
+Synchronous version of fs.open(). Returns an integer representing the file descriptor.
+
+fs.read(fd, buffer, offset, length, position, callback)#
+Added in: v0.0.2
+fd <integer>
+buffer <string> | <Buffer>
+offset <integer>
+length <integer>
+position <integer>
+callback <Function>
+Read data from the file specified by fd.
+
+buffer is the buffer that the data will be written to.
+
+offset is the offset in the buffer to start writing at.
+
+length is an integer specifying the number of bytes to read.
+
+position is an integer specifying where to begin reading from in the file. If position is null, data will be read from the current file position.
+
+The callback is given the three arguments, (err, bytesRead, buffer).
+
+fs.readdir(path[, options], callback)#
+Added in: v0.1.8
+path <string> | <Buffer>
+options <string> | <Object>
+encoding <string> default = 'utf8'
+callback <Function>
+Asynchronous readdir(3). Reads the contents of a directory. The callback gets two arguments (err, files) where files is an array of the names of the files in the directory excluding '.' and '..'.
+
+The optional options argument can be a string specifying an encoding, or an object with an encoding property specifying the character encoding to use for the filenames passed to the callback. If the encoding is set to 'buffer', the filenames returned will be passed as Buffer objects.
+
+fs.readdirSync(path[, options])#
+Added in: v0.1.21
+path <string> | <Buffer>
+options <string> | <Object>
+encoding <string> default = 'utf8'
+Synchronous readdir(3). Returns an array of filenames excluding '.' and '..'.
+
+The optional options argument can be a string specifying an encoding, or an object with an encoding property specifying the character encoding to use for the filenames passed to the callback. If the encoding is set to 'buffer', the filenames returned will be passed as Buffer objects.
+
+fs.readFile(file[, options], callback)#
+Added in: v0.1.29
+file <string> | <Buffer> | <integer> filename or file descriptor
+options <Object> | <string>
+encoding <string> | <null> default = null
+flag <string> default = 'r'
+callback <Function>
+Asynchronously reads the entire contents of a file. Example:
+
+fs.readFile('/etc/passwd', (err, data) => {
+  if (err) throw err;
+  console.log(data);
+});
+The callback is passed two arguments (err, data), where data is the contents of the file.
+
+If no encoding is specified, then the raw buffer is returned.
+
+If options is a string, then it specifies the encoding. Example:
+
+fs.readFile('/etc/passwd', 'utf8', callback);
+Note: When the path is a directory, the behavior of fs.readFile() and [fs.readFileSync()][] is platform-specific. On macOS, Linux, and Windows, an error will be returned. On FreeBSD, a representation of the directory's contents will be returned.
+
+// macOS, Linux and Windows
+fs.readFile('<directory>', (err, data) => {
+  // => [Error: EISDIR: illegal operation on a directory, read <directory>]
+});
+
+//  FreeBSD
+fs.readFile('<directory>', (err, data) => {
+  // => null, <data>
+});
+Any specified file descriptor has to support reading.
+
+Note: If a file descriptor is specified as the path, it will not be closed automatically.
+
+fs.readFileSync(file[, options])#
+Added in: v0.1.8
+file <string> | <Buffer> | <integer> filename or file descriptor
+options <Object> | <string>
+encoding <string> | <null> default = null
+flag <string> default = 'r'
+Synchronous version of fs.readFile. Returns the contents of the file.
+
+If the encoding option is specified then this function returns a string. Otherwise it returns a buffer.
+
+Note: Similar to [fs.readFile()][], when the path is a directory, the behavior of fs.readFileSync() is platform-specific.
+
+/
