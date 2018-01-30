@@ -19,8 +19,8 @@ class Server {
     
     
     server.listen(this.conf.port, this.conf.hostname, () => {
-      const addr = `http://baidu.com`;
-      openUrl(addr);
+      // const addr = `http://baidu.com`;
+      // openUrl(addr);
       console.log('yes!');
     });
   }

@@ -7,7 +7,9 @@
     "anydoor": "./bin/anydoor"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "gulp": "sudo gulp",
+    "start": "node bin/anydoor"
   },
   "repository": {
     "type": "git",
@@ -22,6 +24,8 @@
   "dependencies": {
     "express": "^4.16.2",
     "formidable": "^1.1.1",
+    "gulp": "^3.9.1",
+    "gulp-less": "^3.4.0",
     "handlebars": "^4.0.11",
     "promisify": "0.0.3",
     "underscore": "^1.8.3",
